@@ -1,0 +1,40 @@
+[
+  {
+    "file": "src/source/lexer.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/lexer.c",
+      "-o",
+      "src/source/lexer.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/lexer.o"
+  },
+  {
+    "file": "src/source/main.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/main.c",
+      "-o",
+      "src/source/main.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/main.o"
+  }
+]

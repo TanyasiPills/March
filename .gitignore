@@ -1,5 +1,6 @@
-/build/
 .vscode/
 *.exe
 *.pdb
 *.ch
+*.d
+*.o

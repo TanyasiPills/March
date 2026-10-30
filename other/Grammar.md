@@ -1,5 +1,5 @@
 # March Grammar
-> MARCH: compilation based programing language, written in C++
+> MARCH: compilation based programing language, written in C
 Language for the SPRING project
 
 ## Variables

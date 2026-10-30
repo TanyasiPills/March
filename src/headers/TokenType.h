@@ -1,29 +1,65 @@
 #pragma once
 
-enum TokenType{
+typedef enum VariableType {
+	u8Type,
+    u16Type,
+    u32Type,
+    u64Type,
+
+	s8Type,
+	s16Type,
+	s32Type,
+	s64Type,
+
+	f32Type,
+	f64Type,
+
+	identifierType
+
+} VariableType_t;
+
+typedef enum ControlType {
+	ReturnType,
+	ForType,
+	WhileType
+} ControlType_t;
+
+typedef enum TokenType{
     //Variables
-    intType,        //0
-    inTType,        //1
-    stringType,     //2
-    nameType,       //3
-    numberType,     //4
-    charType,       //5
-    textType,       //6
+	SymbolType,
+    PtrType, 
+    StringType,
+	NumberType,
 
     //Math
-    assingType,     //7
-    additionType,   //8
-    subtractioType, //9
-    multiplicationType,
-    divisionType,
+    AssingType, 
+    AdditionType, 
+    AdditionByType, 
+    SubtractionType,
+    SubtractionByType,
+    MultiplicationType,
+    MultiplicationByType,
+    DivisionType,
+    DivisionByType,
+	IncrementType,
+	DecrementType,
 
     //logic
-    LBraceType,
-    RBraceType,
+    BraceLeftType,
+    BraceRightType,
+	EqualType,
+	NotEqualType,
+	LessOrEqualType,
+	MoreOrEqualType,
+	LessType,
+	MoreType,
+	NotType,
+
+	CurlyLeftType,
+	CurlyRightType,
 
     //file
-    functionType,   //10
-    commandType,    //11
-    lineType,       //12
-    EOFType         //13
-};
+    LineType,
+	SeparatorType,
+	ContainType
+} TokenType_t;
