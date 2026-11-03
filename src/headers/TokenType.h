@@ -21,7 +21,8 @@ typedef enum VariableType {
 typedef enum ControlType {
 	ReturnType,
 	ForType,
-	WhileType
+	WhileType,
+	InvalidType
 } ControlType_t;
 
 typedef enum TokenType{
@@ -32,7 +33,7 @@ typedef enum TokenType{
 	NumberType,
 
     //Math
-    AssingType, 
+    AssignType, 
     AdditionType, 
     AdditionByType, 
     SubtractionType,
@@ -61,5 +62,6 @@ typedef enum TokenType{
     //file
     LineType,
 	SeparatorType,
-	ContainType
+	ContainType,
+	EOFType
 } TokenType_t;

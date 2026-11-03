@@ -1,5 +1,6 @@
 #include "lexer.h"
 #include <stdio.h>
+#include <parser.h>
 
 int main(int argc, char* argv[])
 {
@@ -9,5 +10,7 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	printf("%s\n", argv[1]);
-	return ProcessFile(argv[1]);
+	int error = ProcessFile(argv[1]);
+
+	ProcessTokens();
 }

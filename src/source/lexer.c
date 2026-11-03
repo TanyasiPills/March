@@ -1,41 +1,21 @@
+#include "TokenType.h"
+#include "vector.h"
+#include <stdint.h>
 #include <stdlib.h>
 #include <lexer.h>
-#include <TokenType.h>
-#include <string.h>
-
-typedef struct {
-    int type;
-    const char *start;
-    int length;
-    int line;
-} Token_t;
-
-typedef struct {
-    Token_t *tokens;
-    int count;
-    int capacity;
-} TokenList;
-
 
 static char* fileData;
 static uint32_t currentPos = 0;
 static uint32_t line = 0;
 
-static TokenList tokens; 
+Vector tokens;
 
+bool tokenTextValid = false;
+char* tokenText;
 
-void AddToken(TokenList *list, int type, const char *start, int length, int line) {
-    if (list->count >= list->capacity) {
-        list->capacity = (list->capacity == 0) ? 128 : list->capacity * 2;
-        list->tokens = realloc(list->tokens, list->capacity * sizeof(Token_t));
-    }
-    
-    list->tokens[list->count++] = (Token_t){
-        .type = type,
-        .start = start,
-        .length = length,
-        .line = line
-    };
+void AddToken(TokenType_t type, const char* nameStart, uint32_t length, uint32_t line) {
+	Token_t token = {type, nameStart, length, line};
+	VectorPush(&tokens, &token);
 }
 
 static char Peek(){
@@ -100,7 +80,7 @@ int ScanLong(){
 
 		currentPos++; 
 
-		AddToken(&tokens, StringType, fileData + startPos, currentPos - startPos, line);
+		AddToken(StringType, fileData + startPos, currentPos - startPos, line);
 		return 0;
 	}
 
@@ -109,7 +89,7 @@ int ScanLong(){
 			currentPos++;
 		}
 
-		AddToken(&tokens, NumberType, fileData+startPos, currentPos - startPos + 1, line);
+		AddToken(NumberType, fileData+startPos, currentPos - startPos + 1, line);
 		return 0;
 	}
 
@@ -119,7 +99,7 @@ int ScanLong(){
 			currentPos++;
 		}
 
-		AddToken(&tokens, SymbolType, fileData+startPos, currentPos - startPos + 1, line);
+		AddToken(SymbolType, fileData+startPos, currentPos - startPos + 1, line);
 		return 0;
 	}
 
@@ -133,11 +113,6 @@ int ScanFile(){
 		return 1;
 	}
 
-	tokens = (TokenList){.tokens = malloc(sizeof(Token_t)), .count = 0, .capacity = 1};
-	if(!tokens.tokens) {
-		LogError(1, line, "Malloc failed");
-		return 1;
-	}
 
 	while(fileData[currentPos] != '\0'){
 		switch (fileData[currentPos]) {
@@ -147,111 +122,111 @@ int ScanFile(){
 				line++;
 				break;
 			case ';':
-				AddToken(&tokens, LineType, fileData + currentPos, 1, line);
+				AddToken(LineType, fileData + currentPos, 1, line);
 				break;
 			case ':':
-				AddToken(&tokens, PtrType, fileData + currentPos, 1, line);
+				AddToken(PtrType, fileData + currentPos, 1, line);
 				break;
 			case '{':
-				AddToken(&tokens, CurlyLeftType, fileData + currentPos, 1, line);
+				AddToken(CurlyLeftType, fileData + currentPos, 1, line);
 				break;
 			case '}':
-				AddToken(&tokens, CurlyRightType, fileData + currentPos, 1, line);
+				AddToken(CurlyRightType, fileData + currentPos, 1, line);
 				break;
 			case '(':
-				AddToken(&tokens, BraceLeftType, fileData + currentPos, 1, line);
+				AddToken(BraceLeftType, fileData + currentPos, 1, line);
 				break;
 			case ')':
-				AddToken(&tokens, BraceRightType, fileData + currentPos, 1, line);
+				AddToken(BraceRightType, fileData + currentPos, 1, line);
 				break;
 			case ',':
-				AddToken(&tokens, SeparatorType, fileData + currentPos, 1, line);
+				AddToken(SeparatorType, fileData + currentPos, 1, line);
 				break;
 			case '.':
-				AddToken(&tokens, ContainType, fileData + currentPos, 1, line);
+				AddToken(ContainType, fileData + currentPos, 1, line);
 				break;
 			case '=': {
 				if(Peek() == '='){
-					AddToken(&tokens, EqualType, fileData + currentPos, 2, line);
+					AddToken(EqualType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, AssingType, fileData + currentPos, 1, line);
+				AddToken(AssignType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '!': {
 				if(Peek() == '='){
-					AddToken(&tokens, NotEqualType, fileData + currentPos, 2, line);
+					AddToken(NotEqualType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, NotType, fileData + currentPos, 1, line);
+				AddToken(NotType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '>': {
 				if(Peek() == '='){
-					AddToken(&tokens, MoreOrEqualType, fileData + currentPos, 2, line);
+					AddToken(MoreOrEqualType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, MoreType, fileData + currentPos, 1, line);
+				AddToken(MoreType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '<': {
 				if(Peek() == '='){
-					AddToken(&tokens, LessOrEqualType, fileData + currentPos, 2, line);
+					AddToken(LessOrEqualType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, LessType, fileData + currentPos, 1, line);
+				AddToken(LessType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '*': {
 				if(Peek() == '='){
-					AddToken(&tokens, MultiplicationByType, fileData + currentPos, 2, line);
+					AddToken(MultiplicationByType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, MultiplicationType, fileData + currentPos, 1, line);
+				AddToken(MultiplicationType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '/': {
 				if(Peek() == '/'){
-					AddToken(&tokens, DivisionByType, fileData + currentPos, 2, line);
+					AddToken(DivisionByType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
-				AddToken(&tokens, DivisionType, fileData + currentPos, 1, line);
+				AddToken(DivisionType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '+': {
 				char peeked = Peek();
 				if(peeked == '='){
-					AddToken(&tokens, AdditionByType, fileData + currentPos, 2, line);
+					AddToken(AdditionByType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				} else if(peeked == '+'){
-					AddToken(&tokens, IncrementType, fileData + currentPos, 2, line);
+					AddToken(IncrementType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
 
-				AddToken(&tokens, AdditionType, fileData + currentPos, 1, line);
+				AddToken(AdditionType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '-': {
 				char peeked = Peek();
 				if(peeked == '='){
-					AddToken(&tokens, SubtractionByType, fileData + currentPos, 2, line);
+					AddToken(SubtractionByType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				} else if(peeked == '+'){
-					AddToken(&tokens, DecrementType, fileData + currentPos, 2, line);
+					AddToken(DecrementType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
 
-				AddToken(&tokens, SubtractionType, fileData + currentPos, 1, line);
+				AddToken(SubtractionType, fileData + currentPos, 1, line);
 				break;
 			}
 			default: {
@@ -263,10 +238,15 @@ int ScanFile(){
 		currentPos++;
 	}
 
+	Token_t eofToken = {EOFType, fileData + currentPos, 0, line};
+	VectorPush(&tokens, &eofToken);
+
 	return 0;
 }
 
 int ProcessFile(const char* path){
+	VectorInit(&tokens, 10, sizeof(Token_t));
+
 	int error;
 
 	error = ReadFile(path);
@@ -277,14 +257,14 @@ int ProcessFile(const char* path){
 
 	printf("sup\n");
 
+		/*
 	for (int i = 0; i < tokens.count; i++) {
 		Token_t token = tokens.tokens[i];
-		char* text = malloc(token.length+1);
-		text[token.length] = '\0';
-		memcpy(text, token.start, token.length);
+		char* text = GetText(&token);
 		printf("line %d; %d; Token: %s\n", token.line, token.type, text);
 		free(text);
 	}
+		*/
 
 	return 0;
 }
