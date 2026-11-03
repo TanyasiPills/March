@@ -133,6 +133,7 @@ ASTNode_t* Primary() {
 		int value = atoi(tokenText);
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->kind = AST_LITERAL;
 		data->intBlock.value = value;
 		return data;
 	}
@@ -145,6 +146,7 @@ ASTNode_t* Primary() {
 		}
 
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->kind = AST_IDENTIFIER;
 		data->identifier.name_start = currentToken.start;
 		data->identifier.name_lenght = currentToken.length;
 		
@@ -156,6 +158,7 @@ ASTNode_t* Primary() {
 		ASTNode_t* expr = Expression();
 		Expect(BraceRightType, "Expected ')'");
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->kind = AST_GROUP;
 		data->group.expr = expr;
 		return data;
 	}
@@ -176,6 +179,7 @@ ASTNode_t* Postfix() {
 		}
 		
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->kind = AST_MEMBER_ACCS;
 		tmp->member_accs.obj = expr;
 		tmp->member_accs.member = tokenText;
 		expr = tmp;
@@ -189,6 +193,7 @@ ASTNode_t* Unary() {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->kind = AST_UNARY_EXPR;
 		data->unary_expr.op = op;
 		data->unary_expr.effected = Unary();
 	}
@@ -206,6 +211,7 @@ ASTNode_t* Term() {
 		ConsumeToken();
 		ASTNode_t* right = Unary();
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->kind = AST_BINARY_EXPR;
 		tmp->binary_expr.left = left;
 		tmp->binary_expr.op = op;
 		tmp->binary_expr.right = right;
@@ -225,6 +231,7 @@ ASTNode_t* Expression() {
 		ConsumeToken();
 		ASTNode_t* right = Term();
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->kind = AST_BINARY_EXPR;
 		tmp->binary_expr.left = left;
 		tmp->binary_expr.op = op;
 		tmp->binary_expr.right = right;
@@ -238,6 +245,7 @@ ASTNode_t* Block() {
 	Expect(CurlyLeftType, "Expected '{' (Block)");
 
 	ASTNode_t* block = malloc(sizeof(ASTNode_t));
+	block->kind = AST_BLOCK;
 	VectorInit(&block->block.content, 1, sizeof(ASTNode_t*));
 
 	while(!Check(CurlyRightType) && !Check(EOFType)){
@@ -284,6 +292,7 @@ ASTNode_t* DeclareOrFunc() {
 	}
 
 	ASTNode_t* decl = malloc(sizeof(ASTNode_t));
+	decl->kind = AST_VAR_DECL;
 	decl->var_decl.type = type;
 
 	if(Match(AssignType))
@@ -311,6 +320,7 @@ ASTNode_t* Statement() {
 		ASTNode_t* value = Expression();
 		Expect(LineType, "Expected ';'");
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->kind = AST_ASSIGNMENT;
 		data->assign.target = target;
 		data->assign.value = value;
 	}
