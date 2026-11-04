@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "vector.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <parser.h>
@@ -79,6 +80,7 @@ bool isVariableType(const char* text, VariableType_t* typeDst){
 
 uint64_t tokenPos = 0;
 Token_t currentToken;
+ASTNode_t* astTree;
 
 void ConsumeToken() {
 	if(tokenPos >= tokens.size)
@@ -133,6 +135,7 @@ ASTNode_t* Primary() {
 		int value = atoi(tokenText);
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = currentToken.line;
 		data->kind = AST_LITERAL;
 		data->intBlock.value = value;
 		return data;
@@ -146,6 +149,7 @@ ASTNode_t* Primary() {
 		}
 
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = currentToken.line;
 		data->kind = AST_IDENTIFIER;
 		data->identifier.name_start = currentToken.start;
 		data->identifier.name_lenght = currentToken.length;
@@ -158,6 +162,7 @@ ASTNode_t* Primary() {
 		ASTNode_t* expr = Expression();
 		Expect(BraceRightType, "Expected ')'");
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = currentToken.line;
 		data->kind = AST_GROUP;
 		data->group.expr = expr;
 		return data;
@@ -179,6 +184,7 @@ ASTNode_t* Postfix() {
 		}
 		
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
 		tmp->kind = AST_MEMBER_ACCS;
 		tmp->member_accs.obj = expr;
 		tmp->member_accs.member = tokenText;
@@ -193,6 +199,7 @@ ASTNode_t* Unary() {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = currentToken.line;
 		data->kind = AST_UNARY_EXPR;
 		data->unary_expr.op = op;
 		data->unary_expr.effected = Unary();
@@ -203,14 +210,13 @@ ASTNode_t* Unary() {
 
 ASTNode_t* Term() {
 	ASTNode_t* left = Unary();
-	left->kind = AST_BINARY_EXPR;
-	left->line = currentToken.line;
 
 	while(Check(MultiplicationType) || Check(DivisionType)) {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* right = Unary();
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
 		tmp->kind = AST_BINARY_EXPR;
 		tmp->binary_expr.left = left;
 		tmp->binary_expr.op = op;
@@ -223,14 +229,13 @@ ASTNode_t* Term() {
 
 ASTNode_t* Expression() {
 	ASTNode_t* left = Term();
-	left->kind = AST_BINARY_EXPR;
-	left->line = currentToken.line;
 
 	while (Check(AdditionType) || Check(SubtractionType)) {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* right = Term();
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
 		tmp->kind = AST_BINARY_EXPR;
 		tmp->binary_expr.left = left;
 		tmp->binary_expr.op = op;
@@ -245,6 +250,7 @@ ASTNode_t* Block() {
 	Expect(CurlyLeftType, "Expected '{' (Block)");
 
 	ASTNode_t* block = malloc(sizeof(ASTNode_t));
+	block->line = currentToken.line;
 	block->kind = AST_BLOCK;
 	VectorInit(&block->block.content, 1, sizeof(ASTNode_t*));
 
@@ -254,7 +260,7 @@ ASTNode_t* Block() {
 	}
 
 	Expect(CurlyRightType, "Expected '}' (Block)");
-	
+
 	return block;
 }
 
@@ -269,6 +275,7 @@ ASTNode_t* DeclareOrFunc() {
 
 	if(Match(PtrType)) {
 		ASTNode_t* func = malloc(sizeof(ASTNode_t));
+		func->line = currentToken.line;
 		func->kind = AST_FUNC_DECL;
 		func->line = token.line;
 		func->func_decl.name_start = token.start;
@@ -282,8 +289,8 @@ ASTNode_t* DeclareOrFunc() {
 				if(Check(SymbolType)) {
 					param.name_start = token.start;
 					param.name_lenght = token.length;
+					ConsumeToken();
 				}
-				ConsumeToken();
 				VectorPush(&func->func_decl.params, &param);
 			} while (Match(SeparatorType));
 		}
@@ -292,6 +299,7 @@ ASTNode_t* DeclareOrFunc() {
 	}
 
 	ASTNode_t* decl = malloc(sizeof(ASTNode_t));
+	decl->line = currentToken.line;
 	decl->kind = AST_VAR_DECL;
 	decl->var_decl.type = type;
 
@@ -314,12 +322,18 @@ ASTNode_t* Statement() {
 	ASTNode_t* target = Expression();
 
 	if(Match(AssignType)) {
-		if(target->kind != AST_IDENTIFIER && target->kind != AST_MEMBER_ACCS)
+		printf("%d\n", currentToken.line);
+		if(target->kind != AST_IDENTIFIER && target->kind != AST_MEMBER_ACCS) {
 			LogError(10, currentToken.line, "Invalid assignment target");
+			GetText(&currentToken);
+			printf("current invalid token: %s", tokenText);
+		}
+
 		
 		ASTNode_t* value = Expression();
 		Expect(LineType, "Expected ';'");
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = currentToken.line;
 		data->kind = AST_ASSIGNMENT;
 		data->assign.target = target;
 		data->assign.value = value;
@@ -329,12 +343,8 @@ ASTNode_t* Statement() {
 }
 
 void ProcessTokens(){
-	Vector nodes;
-	VectorInit(&nodes, 10, sizeof(ASTNode_t*));
-
-	while(currentToken.type != EOFType) {
-		ASTNode_t* data = Statement();
-		VectorPush(&nodes, &data); 
-	}
+	currentToken = ((Token_t*)tokens.data)[0];
+	astTree = Block();
+	printf("finish?\n");
 }
 

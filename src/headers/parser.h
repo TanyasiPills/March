@@ -112,5 +112,6 @@ typedef struct ASTNode {
     };
 } ASTNode_t;
 
+extern ASTNode_t* astTree;
 
 void ProcessTokens();

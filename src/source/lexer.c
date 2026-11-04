@@ -1,6 +1,7 @@
 #include "TokenType.h"
 #include "vector.h"
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <lexer.h>
 
@@ -112,6 +113,8 @@ int ScanFile(){
 		LogError(1, line, "Malloc failed");
 		return 1;
 	}
+
+	AddToken(CurlyLeftType, fileData + currentPos, 0, line);
 
 
 	while(fileData[currentPos] != '\0'){
@@ -238,8 +241,8 @@ int ScanFile(){
 		currentPos++;
 	}
 
-	Token_t eofToken = {EOFType, fileData + currentPos, 0, line};
-	VectorPush(&tokens, &eofToken);
+	AddToken(CurlyRightType, fileData + currentPos, 0, line);
+	AddToken(EOFType, fileData+currentPos, 0, line);
 
 	return 0;
 }
@@ -256,15 +259,6 @@ int ProcessFile(const char* path){
 	if(error) return error;
 
 	printf("sup\n");
-
-		/*
-	for (int i = 0; i < tokens.count; i++) {
-		Token_t token = tokens.tokens[i];
-		char* text = GetText(&token);
-		printf("line %d; %d; Token: %s\n", token.line, token.type, text);
-		free(text);
-	}
-		*/
-
+	
 	return 0;
 }
