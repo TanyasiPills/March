@@ -1,6 +1,10 @@
 #pragma once
 
-#include <stdio.h>
 
 #define Log(x) printf("%s\n", x);
-#define LogError(type,line,text) fprintf(stderr, "%d error at line %d:\n%s\n", type, line, text);
+
+#define LogLexerError(line,text) fprintf(stderr, "\nError at line %d: %s\n\n", line, text);
+
+#define LogError(line,text) {fprintf(stderr, "\nError at line %d: %s\n", line, text); \
+							GetText(&currentToken); \
+							printf("Current invalid token: '%s'\n\n", tokenText);}

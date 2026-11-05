@@ -14,7 +14,8 @@ typedef enum VariableType {
 	f32Type,
 	f64Type,
 
-	identifierType
+	identifierType,
+	invalidVariableType
 
 } VariableType_t;
 
@@ -63,5 +64,6 @@ typedef enum TokenType{
     LineType,
 	SeparatorType,
 	ContainType,
-	EOFType
+	EOFType,
+	InvalidTokenType
 } TokenType_t;

@@ -1,8 +1,6 @@
 #pragma once
 
 #include <bare.h>
-#include <stdlib.h>
-#include <string.h>
 #include <TokenType.h>
 #include <vector.h>
 

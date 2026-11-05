@@ -4,5 +4,6 @@ u8 a = 2;
 a.b.ptr = 24 * 20 + 4/5;
 
 u8 funly: u8 a, u16 {
-
+	u16 tmp = a;
+	tmp++;
 }

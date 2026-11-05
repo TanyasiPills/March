@@ -1,11 +1,3 @@
-#include "TokenType.h"
-#include "lexer.h"
-#include "logger.h"
-#include "vector.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 #include <parser.h>
 
 typedef struct {
@@ -37,18 +29,9 @@ static const ControlMapping conTypes[] = {
 	{"for", ForType}
 };
 
-
-VariableType_t lookup_variable(const char *text) {
-    int count = sizeof(varTypes) / sizeof(varTypes[0]);
-    
-    for (int i = 0; i < count; i++) {
-        if (strcmp(varTypes[i].text, text) == 0) {
-            return varTypes[i].type;
-        }
-    }
-    
-    return identifierType; 
-}
+uint64_t tokenPos = 0;
+Token_t currentToken;
+ASTNode_t* astTree;
 
 bool isVariableControl(const char* text, ControlType_t* controlDst){
 	int count = sizeof(conTypes) / sizeof(conTypes[0]);
@@ -78,13 +61,9 @@ bool isVariableType(const char* text, VariableType_t* typeDst){
 	return false;
 }
 
-uint64_t tokenPos = 0;
-Token_t currentToken;
-ASTNode_t* astTree;
-
 void ConsumeToken() {
 	if(tokenPos >= tokens.size)
-		LogError(5, 0, "Cant extract any more tokens from the lexer (ConsumeToken)");
+		LogError(0, "Cant extract any more tokens from the lexer (ConsumeToken)");
 
 	currentToken = ((Token_t*)tokens.data)[++tokenPos];
 }
@@ -103,7 +82,9 @@ static bool Match(TokenType_t type) {
 
 static Token_t Expect(TokenType_t type, const char* msg) {
 	if(!Check(type)) {
-		LogError(6, currentToken.line, msg);
+		LogError(currentToken.line, msg);
+		Token_t invalid = {InvalidTokenType, 0, 0, 0}; 
+		return invalid; 
 	}
 
 	Token_t toky = currentToken;
@@ -117,9 +98,13 @@ static TypeInfo_t Type() {
 	while (Match(PtrType)) info.pointerDepth++;
 
 	GetText(&currentToken);
-	VariableType_t type;
-	if(!isVariableType(tokenText, &type))
-		LogError(7, currentToken.line, "Type expected (Type)");
+	VariableType_t type = -1;
+	if(!isVariableType(tokenText, &type)) {
+		LogError(currentToken.line, "Type expected (Type)");
+		info.type = invalidVariableType;
+		info.pointerDepth = 0;
+		return info;
+	}
 
 	info.type = type;
 	ConsumeToken();
@@ -144,7 +129,7 @@ ASTNode_t* Primary() {
 		GetText(&currentToken);
 
 		if(isVariableType(tokenText, NULL) || isVariableControl(tokenText, NULL)) {
-			LogError(9, currentToken.line, "Expected an identifier (Primary)");
+			LogError(currentToken.line, "Expected an identifier (Primary)");
 			return NULL;
 		}
 
@@ -160,7 +145,9 @@ ASTNode_t* Primary() {
 	}
 	if(Match(BraceLeftType)) {
 		ASTNode_t* expr = Expression();
-		Expect(BraceRightType, "Expected ')'");
+		if(!expr) return NULL;
+		Token_t out = Expect(BraceRightType, "Expected ')'");
+		if(out.type == InvalidTokenType) return NULL;
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
 		data->line = currentToken.line;
 		data->kind = AST_GROUP;
@@ -173,13 +160,15 @@ ASTNode_t* Primary() {
 
 ASTNode_t* Postfix() {
 	ASTNode_t* expr = Primary();
+	if(!expr) return NULL;
 
 	while(Match(ContainType)) {
 		GetText(&currentToken);
 		Token_t token = Expect(SymbolType, "Expected member name (Postfix)");
+		if(token.type == InvalidTokenType) return NULL;
 
 		if(isVariableType(tokenText, NULL) || isVariableControl(tokenText, NULL)) {
-			LogError(9, token.line, "Expected member name (Postfix)");
+			LogError(token.line, "Expected member name (Postfix)");
 			return NULL;
 		}
 		
@@ -188,6 +177,15 @@ ASTNode_t* Postfix() {
 		tmp->kind = AST_MEMBER_ACCS;
 		tmp->member_accs.obj = expr;
 		tmp->member_accs.member = tokenText;
+		expr = tmp;
+	}
+	if(Check(IncrementType) || Check(DecrementType)) {
+		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
+		tmp->kind = AST_UNARY_EXPR;
+		tmp->unary_expr.op = currentToken.type;
+		tmp->unary_expr.effected = expr;	
+		ConsumeToken();
 		expr = tmp;
 	}
 
@@ -203,6 +201,11 @@ ASTNode_t* Unary() {
 		data->kind = AST_UNARY_EXPR;
 		data->unary_expr.op = op;
 		data->unary_expr.effected = Unary();
+		if(!data->unary_expr.effected) {
+			free(data);
+			return NULL;
+		}
+		return data;
 	}
 
 	return Postfix();
@@ -210,11 +213,13 @@ ASTNode_t* Unary() {
 
 ASTNode_t* Term() {
 	ASTNode_t* left = Unary();
+	if(!left)return NULL;
 
 	while(Check(MultiplicationType) || Check(DivisionType)) {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* right = Unary();
+		if(!right) return NULL;
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
 		tmp->line = currentToken.line;
 		tmp->kind = AST_BINARY_EXPR;
@@ -229,11 +234,13 @@ ASTNode_t* Term() {
 
 ASTNode_t* Expression() {
 	ASTNode_t* left = Term();
+	if(!left) return NULL;
 
 	while (Check(AdditionType) || Check(SubtractionType)) {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* right = Term();
+		if(!right) return NULL;
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
 		tmp->line = currentToken.line;
 		tmp->kind = AST_BINARY_EXPR;
@@ -247,7 +254,8 @@ ASTNode_t* Expression() {
 }
 
 ASTNode_t* Block() {
-	Expect(CurlyLeftType, "Expected '{' (Block)");
+	Token_t out = Expect(CurlyLeftType, "Expected '{' (Block)");
+	if(out.type == InvalidTokenType) return NULL;
 
 	ASTNode_t* block = malloc(sizeof(ASTNode_t));
 	block->line = currentToken.line;
@@ -256,20 +264,31 @@ ASTNode_t* Block() {
 
 	while(!Check(CurlyRightType) && !Check(EOFType)){
 		ASTNode_t* result = Statement();
+		if(!result) {
+			VectorFree(&block->block.content);
+			free(block);
+			return NULL;
+		}
 		VectorPush(&block->block.content, &result);
 	}
 
-	Expect(CurlyRightType, "Expected '}' (Block)");
+	out = Expect(CurlyRightType, "Expected '}' (Block)");
+	if(out.type == InvalidTokenType) {
+		free(block);
+		return NULL;
+	}
 
 	return block;
 }
 
 ASTNode_t* DeclareOrFunc() {
 	TypeInfo_t type = Type();
+	if(type.type == invalidVariableType) return NULL;
 	Token_t token = Expect(SymbolType, "Expected identifier (DeclareOrFunc)");
+	if(token.type == InvalidTokenType) return NULL;
 	GetText(&token);
 	if(isVariableType(tokenText, NULL) || isVariableControl(tokenText, NULL)){
-		LogError(8, token.line, "Symbol is not identifier (DeclareOrFunc)");
+		LogError(token.line, "Symbol is not identifier (DeclareOrFunc)");
 		return NULL;
 	}
 
@@ -286,6 +305,11 @@ ASTNode_t* DeclareOrFunc() {
 			do {
 				Parameter_t param;
 				param.dataType = Type();
+				if(param.dataType.type == invalidVariableType) {
+					VectorFree(&func->func_decl.params);
+					free(func);
+					return NULL;
+				}
 				if(Check(SymbolType)) {
 					param.name_start = token.start;
 					param.name_lenght = token.length;
@@ -295,6 +319,11 @@ ASTNode_t* DeclareOrFunc() {
 			} while (Match(SeparatorType));
 		}
 		func->func_decl.body = Block();
+		if(!func->func_decl.body) {
+			VectorFree(&func->func_decl.params);
+			free(func);
+			return NULL;
+		}
 		return func;
 	}
 
@@ -303,48 +332,76 @@ ASTNode_t* DeclareOrFunc() {
 	decl->kind = AST_VAR_DECL;
 	decl->var_decl.type = type;
 
-	if(Match(AssignType))
+	if(Match(AssignType)) {
 		decl->var_decl.initializer = Expression();
+		if(!decl->var_decl.initializer) {
+			free(decl);
+			return NULL;
+		}
+	}
 
-	Expect(LineType, "Expected ';' (DeclareOrFunc)");
+	Token_t out = Expect(LineType, "Expected ';' or '=' (DeclareOrFunc)");
+	if(out.type == InvalidTokenType) {
+		free(decl);
+		return NULL;
+	}
 
 	return decl;
 }
 
 ASTNode_t* Statement() {
 	GetText(&currentToken);
-	if(isVariableType(tokenText, NULL) || Check(PtrType))
-		return DeclareOrFunc();
+	if(isVariableType(tokenText, NULL) || Check(PtrType)) {
+		ASTNode_t* declOrFunc = DeclareOrFunc();
+		if(!declOrFunc) return NULL;
+		return declOrFunc;
+	}
 
-	if(Check(CurlyLeftType))
-		return Block();
+	if(Check(CurlyLeftType)) {
+		ASTNode_t* block = Block();
+		if(!block) return NULL;
+		return block;
+	}
 
 	ASTNode_t* target = Expression();
+	if(!target) return NULL;
 
 	if(Match(AssignType)) {
-		printf("%d\n", currentToken.line);
 		if(target->kind != AST_IDENTIFIER && target->kind != AST_MEMBER_ACCS) {
-			LogError(10, currentToken.line, "Invalid assignment target");
-			GetText(&currentToken);
-			printf("current invalid token: %s", tokenText);
+			LogError(currentToken.line, "Invalid assignment target (Statement)");
 		}
 
 		
 		ASTNode_t* value = Expression();
-		Expect(LineType, "Expected ';'");
+		if(!value) return NULL;
+		Token_t out = Expect(LineType, "Expected ';'");
+		if(out.type == InvalidTokenType) return NULL;
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
 		data->line = currentToken.line;
 		data->kind = AST_ASSIGNMENT;
 		data->assign.target = target;
 		data->assign.value = value;
+
+		return data;
 	}
+	if(target->kind == AST_UNARY_EXPR && Match(LineType)){
+		return target;
+	}
+
+	LogError(currentToken.line, "invalid operator in expression (Statement)");
 
 	return NULL;
 }
 
-void ProcessTokens(){
+int ProcessTokens(){
 	currentToken = ((Token_t*)tokens.data)[0];
+
 	astTree = Block();
-	printf("finish?\n");
+	if(!astTree){
+		printf("Parsing stops because of error\n");
+		return 1;
+	}
+
+	return 0;
 }
 

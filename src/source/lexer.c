@@ -1,13 +1,9 @@
-#include "TokenType.h"
-#include "vector.h"
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <lexer.h>
+#include <vector.h>
 
 static char* fileData;
 static uint32_t currentPos = 0;
-static uint32_t line = 0;
+static uint32_t line = 1;
 
 Vector tokens;
 
@@ -38,7 +34,7 @@ static inline bool IsAlphaNumeric(char charIn){
 static int ReadFile(const char* path){
 	FILE* file = fopen(path, "rb");
 	if(!file){
-		LogError(404, line, "Coudn't open file");
+		LogLexerError(line, "Coudn't open file");
 		return 404;
 	}
 
@@ -48,7 +44,7 @@ static int ReadFile(const char* path){
 
 	fileData = malloc(size+1);
 	if(!fileData){
-		LogError(1, line, "Malloc failed");
+		LogLexerError(line, "Malloc failed");
 		return 1;
 	}
 
@@ -75,7 +71,7 @@ int ScanLong(){
 		}
 
 		if (fileData[currentPos] == '\0') {
-			LogError(2, line, "End of file"); 
+			LogLexerError(line, "End of file"); 
 			return 2;
 		}
 
@@ -104,22 +100,29 @@ int ScanLong(){
 		return 0;
 	}
 
-	LogError(3, line, "Error: Cannot lexer char");
-	return 999;
+	LogLexerError(line, "Error: Cannot lexer char");
+	char* text = malloc(sizeof(char)*2);
+	text[1] = '\0';
+	text[0] = fileData[startPos];
+	printf("yo '%s' yo\n", text);
+
+	return 1;
 }
 
 int ScanFile(){
 	if(!fileData){
-		LogError(1, line, "Malloc failed");
+		LogLexerError(line, "Malloc failed");
 		return 1;
 	}
 
-	AddToken(CurlyLeftType, fileData + currentPos, 0, line);
+	AddToken(CurlyLeftType, fileData + currentPos, 0, 0);
 
 
 	while(fileData[currentPos] != '\0'){
 		switch (fileData[currentPos]) {
 			case ' ':
+				break;
+			case '\t':
 				break;
 			case '\n':
 				line++;
@@ -258,7 +261,5 @@ int ProcessFile(const char* path){
 	error = ScanFile();
 	if(error) return error;
 
-	printf("sup\n");
-	
 	return 0;
 }
