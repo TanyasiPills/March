@@ -4,4 +4,4 @@
 *.ch
 *.d
 *.o
-compile_commands.json
+*.json
