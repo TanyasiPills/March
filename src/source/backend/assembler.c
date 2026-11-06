@@ -1,7 +1,4 @@
-#include <MachineTable.h>
 #include <assembler.h>
-#include <stddef.h>
-#include <stdint.h>
 
 static void emit8(Code *c, uint8_t b) {
     if (c->len == c->cap) {
@@ -175,10 +172,10 @@ void idiv_r(Code* c, Reg divider) {
 
 }
 void inc_r (Code* c, Reg r) {
-	emit_ext(c, GRP_F7, EXT_INC, r);
+	emit_ext(c, GRP_FF, EXT_INC, r);
 }
 void dec_r (Code* c, Reg r) {
-	emit_ext(c, GRP_F7, EXT_DEC, r);
+	emit_ext(c, GRP_FF, EXT_DEC, r);
 }
 
 // ---- conditions ----

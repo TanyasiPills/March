@@ -1,4 +1,7 @@
+#include "TokenType.h"
+#include "logger.h"
 #include <parser.h>
+#include <stdio.h>
 
 typedef struct {
 	const char* text;
@@ -93,7 +96,7 @@ static Token_t Expect(TokenType_t type, const char* msg) {
 }
 
 static TypeInfo_t Type() {
-	TypeInfo_t info;
+	TypeInfo_t info = {-1, 0};
 
 	while (Match(PtrType)) info.pointerDepth++;
 
@@ -153,8 +156,12 @@ ASTNode_t* Primary() {
 		data->kind = AST_GROUP;
 		data->group.expr = expr;
 		return data;
-	}
+	}/*
+	if (Match(StringType)) {
+		
+	}*/
 
+	LogError(currentToken.line, "Cant parse primary token");
 	return NULL;
 }
 
@@ -331,6 +338,9 @@ ASTNode_t* DeclareOrFunc() {
 	decl->line = currentToken.line;
 	decl->kind = AST_VAR_DECL;
 	decl->var_decl.type = type;
+	printf("type pointerDepth %d\n", type.pointerDepth);
+	decl->var_decl.name_start = token.start;
+	decl->var_decl.name_length = token.length;
 
 	if(Match(AssignType)) {
 		decl->var_decl.initializer = Expression();

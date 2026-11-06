@@ -1,9 +1,9 @@
 u8 a = 2;
-:u8 aPtr = a;
+:u8 aPtr = :a;
 
-a.b.ptr = 24 * 20 + 4/5;
+u16 ja = a;
 
-u8 funly: u8 a, u16 {
-	u16 tmp = a;
-	tmp++;
-}
+:u16 bPtr = :a;
+
+u32 zsa = a + (3*5);
+

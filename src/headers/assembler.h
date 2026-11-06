@@ -1,8 +1,7 @@
 #pragma once
 
-#include "MachineTable.h"
+#include <MachineTable.h>
 #include <bare.h>
-#include <stdint.h>
 
 typedef struct { uint8_t *buf; size_t len, cap; } Code;
 

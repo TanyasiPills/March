@@ -1,5 +1,24 @@
 [
   {
+    "file": "src/source/main.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/main.c",
+      "-o",
+      "src/source/main.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/main.o"
+  },
+  {
     "file": "src/source/frontend/parser.c",
     "arguments": [
       "/usr/sbin/cc",
@@ -17,44 +36,6 @@
     ],
     "directory": "/home/maychii/coding/March",
     "output": "src/source/frontend/parser.o"
-  },
-  {
-    "file": "src/source/frontend/backend/assembler.c",
-    "arguments": [
-      "/usr/sbin/cc",
-      "-MD",
-      "-c",
-      "src/source/frontend/backend/assembler.c",
-      "-o",
-      "src/source/frontend/backend/assembler.o",
-      "-O2",
-      "-g",
-      "-Wall",
-      "-Wextra",
-      "-std=gnu11",
-      "-Isrc/headers"
-    ],
-    "directory": "/home/maychii/coding/March",
-    "output": "src/source/frontend/backend/assembler.o"
-  },
-  {
-    "file": "src/source/frontend/backend/linker.c",
-    "arguments": [
-      "/usr/sbin/cc",
-      "-MD",
-      "-c",
-      "src/source/frontend/backend/linker.c",
-      "-o",
-      "src/source/frontend/backend/linker.o",
-      "-O2",
-      "-g",
-      "-Wall",
-      "-Wextra",
-      "-std=gnu11",
-      "-Isrc/headers"
-    ],
-    "directory": "/home/maychii/coding/March",
-    "output": "src/source/frontend/backend/linker.o"
   },
   {
     "file": "src/source/frontend/lexer.c",
@@ -93,5 +74,43 @@
     ],
     "directory": "/home/maychii/coding/March",
     "output": "src/source/backend/assembler.o"
+  },
+  {
+    "file": "src/source/backend/semanal.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/backend/semanal.c",
+      "-o",
+      "src/source/backend/semanal.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/backend/semanal.o"
+  },
+  {
+    "file": "src/source/vector.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/vector.c",
+      "-o",
+      "src/source/vector.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/vector.o"
   }
 ]

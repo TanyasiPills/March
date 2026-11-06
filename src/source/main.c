@@ -1,6 +1,7 @@
 #include "lexer.h"
 #include <stdio.h>
 #include <parser.h>
+#include <codegen.h>
 
 void Pad(){
 	printf("\n\n\n\n");
@@ -28,6 +29,13 @@ int main(int argc, char* argv[])
 		return error;
 	}
 	printf("Tokens successfully parsed to AST nodes\n");
+
+	error = Analize(astTree);
+	if(error) {
+		Pad();
+		return error;
+	}
+	printf("AST tree successfully analized\n");
 
 	Pad();
 
