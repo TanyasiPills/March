@@ -12,7 +12,7 @@ endif
 CFLAGS:=$(CFLAGS) -Wall -Wextra -std=gnu11 -Isrc/headers
 CPPFLAGS:=$(CPPFLAGS) 
 
-OBJS=$(patsubst %.c,%.o,$(wildcard src/source/*.c))
+OBJS = $(patsubst %.c,%.o,$(shell find src/source -name "*.c"))
 
 ifeq ($(MAYOS),1)
 CFLAGS:=$(CFLAGS) -ffreestanding -fno-stack-protector -fno-pic -fno-pie -m64 -march=x86-64

@@ -1,13 +1,13 @@
 [
   {
-    "file": "src/source/parser.c",
+    "file": "src/source/frontend/parser.c",
     "arguments": [
       "/usr/sbin/cc",
       "-MD",
       "-c",
-      "src/source/parser.c",
+      "src/source/frontend/parser.c",
       "-o",
-      "src/source/parser.o",
+      "src/source/frontend/parser.o",
       "-O2",
       "-g",
       "-Wall",
@@ -16,6 +16,82 @@
       "-Isrc/headers"
     ],
     "directory": "/home/maychii/coding/March",
-    "output": "src/source/parser.o"
+    "output": "src/source/frontend/parser.o"
+  },
+  {
+    "file": "src/source/frontend/backend/assembler.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/frontend/backend/assembler.c",
+      "-o",
+      "src/source/frontend/backend/assembler.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/frontend/backend/assembler.o"
+  },
+  {
+    "file": "src/source/frontend/backend/linker.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/frontend/backend/linker.c",
+      "-o",
+      "src/source/frontend/backend/linker.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/frontend/backend/linker.o"
+  },
+  {
+    "file": "src/source/frontend/lexer.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/frontend/lexer.c",
+      "-o",
+      "src/source/frontend/lexer.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/frontend/lexer.o"
+  },
+  {
+    "file": "src/source/backend/assembler.c",
+    "arguments": [
+      "/usr/sbin/cc",
+      "-MD",
+      "-c",
+      "src/source/backend/assembler.c",
+      "-o",
+      "src/source/backend/assembler.o",
+      "-O2",
+      "-g",
+      "-Wall",
+      "-Wextra",
+      "-std=gnu11",
+      "-Isrc/headers"
+    ],
+    "directory": "/home/maychii/coding/March",
+    "output": "src/source/backend/assembler.o"
   }
 ]
