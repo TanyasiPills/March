@@ -1,7 +1,11 @@
 #include "TokenType.h"
+#include "lexer.h"
 #include "logger.h"
+#include "vector.h"
 #include <parser.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 typedef struct {
 	const char* text;
@@ -29,7 +33,10 @@ static const VariableMapping varTypes[] = {
 static const ControlMapping conTypes[] = {
 	{"return", ReturnType},
 	{"while", WhileType},
-	{"for", ForType}
+	{"for", ForType},
+	{"if", IfType},
+	{"elif", ElifType},
+	{"else", ElseType}
 };
 
 uint64_t tokenPos = 0;
@@ -124,8 +131,8 @@ ASTNode_t* Primary() {
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
 		data->line = currentToken.line;
-		data->kind = AST_LITERAL;
-		data->intBlock.value = value;
+		data->kind = AST_NUMBER;
+		data->number.value = value;
 		return data;
 	}
 	if(Check(SymbolType)) {
@@ -135,8 +142,9 @@ ASTNode_t* Primary() {
 			LogError(currentToken.line, "Expected an identifier (Primary)");
 			return NULL;
 		}
-
+		
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+
 		data->line = currentToken.line;
 		data->kind = AST_IDENTIFIER;
 		data->identifier.name_start = currentToken.start;
@@ -148,18 +156,35 @@ ASTNode_t* Primary() {
 	}
 	if(Match(BraceLeftType)) {
 		ASTNode_t* expr = Expression();
+
 		if(!expr) return NULL;
+
 		Token_t out = Expect(BraceRightType, "Expected ')'");
+
 		if(out.type == InvalidTokenType) return NULL;
+
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+
 		data->line = currentToken.line;
 		data->kind = AST_GROUP;
 		data->group.expr = expr;
-		return data;
-	}/*
-	if (Match(StringType)) {
 		
-	}*/
+		return data;
+	}
+	if (Check(StringType)) {
+		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+
+		data->line = currentToken.line;
+		data->kind = AST_STRING;
+		data->string.string = malloc(currentToken.length-1); //caus -2 for the "" and +1 for the \0
+		data->string.string[currentToken.length-2] = '\0';
+
+		memcpy(data->string.string, currentToken.start+1, currentToken.length-2);
+
+		ConsumeToken();
+
+		return data;
+	}
 
 	LogError(currentToken.line, "Cant parse primary token");
 	return NULL;
@@ -188,27 +213,61 @@ ASTNode_t* Postfix() {
 	}
 	if(Check(IncrementType) || Check(DecrementType)) {
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+
 		tmp->line = currentToken.line;
-		tmp->kind = AST_UNARY_EXPR;
-		tmp->unary_expr.op = currentToken.type;
-		tmp->unary_expr.effected = expr;	
+		tmp->kind = AST_UNARY;
+		tmp->unary.op = currentToken.type;
+		tmp->unary.effected = expr;	
+
 		ConsumeToken();
-		expr = tmp;
+
+		return tmp;
+	}
+	
+	
+	if(expr->kind == AST_IDENTIFIER && Match(PtrType)) {
+		GetText(&currentToken);
+		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = expr->line;
+
+		if(!isVariableType(tokenText, NULL) && !isVariableControl(tokenText, NULL) 
+				&& currentToken.type != LineType && currentToken.type != EOFType && currentToken.type != AssignType){
+			data->kind = AST_FUNC_CALL;
+			data->func_call.identifier = expr;
+			VectorInit(&data->func_call.params, 2, sizeof(ASTNode_t*));
+			do {
+				ASTNode_t* param = Expression();
+				if(!param){
+					VectorFree(&data->func_call.params);
+					free(data);
+					return NULL;
+				}
+				
+				VectorPush(&data->func_call.params, &param);
+			} while (Match(SeparatorType));
+
+			return data;
+		}
+		//dereferencing ptr
+		data->kind = AST_UNARY;
+		data->unary.op = DereferenceType;
+		data->unary.effected = expr;
+
+		return data;
 	}
 
 	return expr;
 }
 
-ASTNode_t* Unary() {
+ASTNode_t* Prefix() {
 	if(Check(PtrType)) {
-		TokenType_t op = currentToken.type;
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
 		data->line = currentToken.line;
-		data->kind = AST_UNARY_EXPR;
-		data->unary_expr.op = op;
-		data->unary_expr.effected = Unary();
-		if(!data->unary_expr.effected) {
+		data->kind = AST_UNARY;
+		data->unary.op = ReferenceType;
+		data->unary.effected = Prefix();
+		if(!data->unary.effected) {
 			free(data);
 			return NULL;
 		}
@@ -219,23 +278,38 @@ ASTNode_t* Unary() {
 }
 
 ASTNode_t* Term() {
-	ASTNode_t* left = Unary();
+	ASTNode_t* left = Prefix();
 	if(!left)return NULL;
 
 	while(Check(MultiplicationType) || Check(DivisionType)) {
 		TokenType_t op = currentToken.type;
 		ConsumeToken();
-		ASTNode_t* right = Unary();
+		ASTNode_t* right = Prefix();
 		if(!right) return NULL;
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
 		tmp->line = currentToken.line;
-		tmp->kind = AST_BINARY_EXPR;
-		tmp->binary_expr.left = left;
-		tmp->binary_expr.op = op;
-		tmp->binary_expr.right = right;
+		tmp->kind = AST_BINARY;
+		tmp->binary.left = left;
+		tmp->binary.op = op;
+		tmp->binary.right = right;
 		left = tmp;
 	}
 
+	while(Check(EqualType) || Check(NotEqualType) || Check(LessType) || Check(MoreType)
+	   || Check(LessOrEqualType) || Check(MoreOrEqualType)) {
+		TokenType_t op = currentToken.type;
+		ConsumeToken();
+		ASTNode_t* right = Prefix();
+		if(!right) return NULL;
+		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
+		tmp->kind = AST_LOGICAL;
+		tmp->binary.left = left;
+		tmp->binary.op = op;
+		tmp->binary.right = right;
+		left = tmp;
+
+	}
 	return left;
 }
 
@@ -250,10 +324,24 @@ ASTNode_t* Expression() {
 		if(!right) return NULL;
 		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
 		tmp->line = currentToken.line;
-		tmp->kind = AST_BINARY_EXPR;
-		tmp->binary_expr.left = left;
-		tmp->binary_expr.op = op;
-		tmp->binary_expr.right = right;
+		tmp->kind = AST_BINARY;
+		tmp->binary.left = left;
+		tmp->binary.op = op;
+		tmp->binary.right = right;
+		left = tmp;
+	}
+
+	while(Check(AndType) || Check(OrType)) {
+		TokenType_t op = currentToken.type;
+		ConsumeToken();
+		ASTNode_t* right = Term();
+		if(!right) return NULL;
+		ASTNode_t* tmp = malloc(sizeof(ASTNode_t));
+		tmp->line = currentToken.line;
+		tmp->kind = AST_LOGICAL;
+		tmp->binary.left = left;
+		tmp->binary.op = op;
+		tmp->binary.right = right;
 		left = tmp;
 	}
 
@@ -306,6 +394,8 @@ ASTNode_t* DeclareOrFunc() {
 		func->line = token.line;
 		func->func_decl.name_start = token.start;
 		func->func_decl.name_length = token.length;
+		func->func_decl.params.size = 0;
+		func->func_decl.returnType = type;
 		
 		if(!Check(CurlyLeftType)) { // so that it has parameters
 			VectorInit(&func->func_decl.params, 1, sizeof(Parameter_t));
@@ -338,9 +428,9 @@ ASTNode_t* DeclareOrFunc() {
 	decl->line = currentToken.line;
 	decl->kind = AST_VAR_DECL;
 	decl->var_decl.type = type;
-	printf("type pointerDepth %d\n", type.pointerDepth);
 	decl->var_decl.name_start = token.start;
 	decl->var_decl.name_length = token.length;
+	decl->var_decl.initializer = NULL;
 
 	if(Match(AssignType)) {
 		decl->var_decl.initializer = Expression();
@@ -350,7 +440,7 @@ ASTNode_t* DeclareOrFunc() {
 		}
 	}
 
-	Token_t out = Expect(LineType, "Expected ';' or '=' (DeclareOrFunc)");
+	Token_t out = Expect(LineType, "Expected ';' (DeclareOrFunc)");
 	if(out.type == InvalidTokenType) {
 		free(decl);
 		return NULL;
@@ -359,12 +449,123 @@ ASTNode_t* DeclareOrFunc() {
 	return decl;
 }
 
+ASTNode_t* Control(ControlType_t controlType) {
+	ASTNode_t* data = malloc(sizeof(ASTNode_t));	
+
+	data->line = currentToken.line;
+	data->kind = AST_CONTROL;
+	data->control.type = controlType;
+	data->control.data = NULL;
+
+	ConsumeToken();
+
+	Token_t type;
+	switch (controlType) {
+		case IfType:
+		case ElifType:
+			data->control.data = malloc(sizeof(ASTNode_t*) * 2);
+
+			type = Expect(PtrType, "Expected ':' after if keyword (Control)");
+			if(type.type == InvalidTokenType) goto cleanup;
+
+			data->control.data[0] = Expression();
+			if(!data->control.data[0]) goto cleanup;
+
+			data->control.data[1] = Block();
+			if(!data->control.data[1]) goto cleanup;
+
+			break;
+		case ElseType:
+			data->control.data = malloc(sizeof(ASTNode_t*));
+
+			data->control.data[0] = Block();
+			if(!data->control.data[0]) goto cleanup;
+			
+			break;
+		case ForType:
+			data->control.data = malloc(sizeof(ASTNode_t*) * 4);
+
+			type = Expect(PtrType, "Expected ':' after for keyword (Control)");
+			if(type.type == InvalidTokenType) goto cleanup;
+
+			data->control.data[0] = DeclareOrFunc();
+			if(!data->control.data[0]) goto cleanup;
+			if(data->control.data[0]->kind != AST_VAR_DECL){
+				LogError(currentToken.line, "Expected variable decleration as the first for expression (Control)")
+			}
+
+			// declare already checks for ';', so here i dont need to
+
+			data->control.data[1] = Expression();
+			if(!data->control.data[1]) goto cleanup;
+
+			type = Expect(LineType, "Expected ';' after for expression keyword (Control)");
+			if(type.type == InvalidTokenType) goto cleanup;
+
+			data->control.data[2] = Expression();
+			if(!data->control.data[2]) goto cleanup;
+
+			data->control.data[3] = Block();
+			if(!data->control.data[3]) goto cleanup;
+
+			break;
+		case ReturnType:
+			if(Check(LineType)){
+				data->control.data = NULL;
+				ConsumeToken();
+				break;
+			}
+
+			data->control.data = malloc(sizeof(ASTNode_t*));
+
+			data->control.data[0] = Expression();
+			if(!data->control.data[0]) goto cleanup;
+
+			type = Expect(LineType, "Expected ';' after for expression keyword (Control)");
+			if(type.type == InvalidTokenType) goto cleanup;
+
+			break;
+		case WhileType:
+			type = Expect(PtrType, "Expected ':' after for keyword (Control)");
+			if(type.type == InvalidTokenType) goto cleanup;
+
+			data->control.data = malloc(sizeof(ASTNode_t*));
+
+			data->control.data[0] = Expression();
+			if(!data->control.data[0]) goto cleanup;
+
+			data->control.data[3] = Block();
+			if(!data->control.data[3]) goto cleanup;
+
+			break;
+		default:
+			goto cleanup;
+			break;
+	}
+
+	return data;
+
+cleanup:
+	if(data->control.data)
+		free(data->control.data);
+	free(data);
+	return NULL;
+}
+
 ASTNode_t* Statement() {
 	GetText(&currentToken);
 	if(isVariableType(tokenText, NULL) || Check(PtrType)) {
 		ASTNode_t* declOrFunc = DeclareOrFunc();
 		if(!declOrFunc) return NULL;
 		return declOrFunc;
+	}
+
+	
+	ControlType_t controlType;
+	if(isVariableControl(tokenText, &controlType)) {
+		ASTNode_t* control = Control(controlType);
+		if(!control) return NULL;
+		return control;
 	}
 
 	if(Check(CurlyLeftType)) {
@@ -377,11 +578,6 @@ ASTNode_t* Statement() {
 	if(!target) return NULL;
 
 	if(Match(AssignType)) {
-		if(target->kind != AST_IDENTIFIER && target->kind != AST_MEMBER_ACCS) {
-			LogError(currentToken.line, "Invalid assignment target (Statement)");
-		}
-
-		
 		ASTNode_t* value = Expression();
 		if(!value) return NULL;
 		Token_t out = Expect(LineType, "Expected ';'");
@@ -394,7 +590,7 @@ ASTNode_t* Statement() {
 
 		return data;
 	}
-	if(target->kind == AST_UNARY_EXPR && Match(LineType)){
+	if(target->kind == AST_UNARY && Match(LineType)){
 		return target;
 	}
 

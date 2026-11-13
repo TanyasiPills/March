@@ -2,6 +2,7 @@
 
 #include <lexer.h>
 #include <TokenType.h>
+#include <stdint.h>
 
 typedef struct TypeInfo {
 	VariableType_t type;
@@ -54,6 +55,12 @@ typedef struct {
 } ASTFuncDecl_t;
 
 typedef struct {
+	ASTNode_t* identifier;
+
+	Vector params;
+} ASTFuncCall_t;
+
+typedef struct {
 	Vector content;
 } ASTBlock_t;
 
@@ -62,9 +69,21 @@ typedef struct {
 	const char* member;
 } ASTMemberAcs_t;
 
+typedef enum {
+	UNSIGNED,
+	SIGNED,
+	PRECISION
+} NumType_t;
+
 typedef struct {
-	int value;
-} ASTInt_t;
+	NumType_t type;
+	uint8_t byteSize;
+	uint64_t value;
+} ASTNumber_t;
+
+typedef struct {
+	char* string;
+} ASTString_t;
 
 typedef struct {
 	ASTNode_t* expr;
@@ -75,20 +94,29 @@ typedef struct {
 	ASTNode_t* value;
 } ASTAssign_t;
 
+typedef struct {
+	ControlType_t type;
+	ASTNode_t** data;
+} ASTControl_t;
+
 typedef enum {
     // Declarations
     AST_VAR_DECL,    // e.g., u8 a = 2;
     AST_FUNC_DECL,   // e.g., u64 test: u8 a { ... }
+	AST_FUNC_CALL,
 
     // Expressions
-    AST_LITERAL,     // e.g., 2
+    AST_NUMBER,     // e.g., 2
+	AST_STRING,		// e.g., "test"
     AST_IDENTIFIER,  // e.g., a
-    AST_UNARY_EXPR,  // e.g., :a (address-of / pointer deref)
-    AST_BINARY_EXPR, // e.g., a + b (for future math)
+    AST_UNARY,  // e.g., :a (address-of / pointer deref)
+    AST_BINARY, // e.g., a + b (for future math)
 	AST_MEMBER_ACCS,
 	AST_INT,
 	AST_GROUP,
 	AST_ASSIGNMENT,
+	AST_CONTROL,
+	AST_LOGICAL,
 
     // Statements & Blocks
     AST_BLOCK,       // e.g., { ... }
@@ -99,16 +127,20 @@ typedef struct ASTNode {
     int line; 
 
     union {
-        ASTBinaryExpr_t binary_expr;
-        ASTUnaryExpr_t	unary_expr;
+        ASTBinaryExpr_t binary;
+        ASTUnaryExpr_t	unary;
 		ASTVarDecl_t    var_decl;
 		ASTFuncDecl_t	func_decl;
+		ASTFuncCall_t	func_call;
 		ASTIdentifier_t	identifier;
 		ASTBlock_t		block;
 		ASTMemberAcs_t  member_accs;
-		ASTInt_t		intBlock;
+		ASTNumber_t		number;
+		ASTString_t		string;
 		ASTGroup_t		group;
 		ASTAssign_t		assign;
+		ASTControl_t	control;
+		ASTBinaryExpr_t logical;
     };
 } ASTNode_t;
 

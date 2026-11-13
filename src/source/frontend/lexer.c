@@ -1,4 +1,6 @@
+#include "TokenType.h"
 #include <lexer.h>
+#include <stdio.h>
 #include <vector.h>
 
 static char* fileData;
@@ -75,10 +77,41 @@ int ScanLong(){
 			return 2;
 		}
 
-		currentPos++; 
-
-		AddToken(StringType, fileData + startPos, currentPos - startPos, line);
+		AddToken(StringType, fileData + startPos, currentPos - startPos + 1, line);
 		return 0;
+	}
+
+	if(fileData[currentPos] == '/') { 
+		if(Peek() == '/'){
+			while(fileData[currentPos] != '\n' && fileData[currentPos] != '\0'){
+				currentPos++;
+			}
+
+			if (fileData[currentPos] == '\0') {
+				LogLexerError(line, "End of file"); 
+				return 2;
+			}
+
+			line++;	
+
+			return 0;
+		}
+		else if(Peek() == '*'){
+			printf("sup? %d\n",currentPos);
+			while(!(fileData[currentPos] == '*' || Peek() == '/') && fileData[currentPos] != '\0'){
+				currentPos++;
+			}
+
+			if (fileData[currentPos] == '\0') {
+				LogLexerError(line, "End of file"); 
+				return 2;
+			}
+
+			currentPos += 2;
+			printf("sup? %d\n",currentPos);
+
+			return 0;
+		}
 	}
 
 	if(IsDigit(fileData[currentPos])){
@@ -175,12 +208,22 @@ int ScanFile(){
 					currentPos++;
 					break;
 				}
+				if(Peek() == '>') {
+					AddToken(BShiftRightType, fileData + currentPos, 2, line);
+					currentPos++;
+					break;
+				}
 				AddToken(MoreType, fileData + currentPos, 1, line);
 				break;
 			}
 			case '<': {
 				if(Peek() == '='){
 					AddToken(LessOrEqualType, fileData + currentPos, 2, line);
+					currentPos++;
+					break;
+				}
+				if(Peek() == '<') {
+					AddToken(BShiftLeftType, fileData + currentPos, 2, line);
 					currentPos++;
 					break;
 				}
@@ -197,9 +240,13 @@ int ScanFile(){
 				break;
 			}
 			case '/': {
-				if(Peek() == '/'){
+				if(Peek() == '='){
 					AddToken(DivisionByType, fileData + currentPos, 2, line);
 					currentPos++;
+					break;
+				}
+				if(Peek() == '/' || Peek() == '*') {
+					ScanLong();
 					break;
 				}
 				AddToken(DivisionType, fileData + currentPos, 1, line);
@@ -233,6 +280,28 @@ int ScanFile(){
 				}
 
 				AddToken(SubtractionType, fileData + currentPos, 1, line);
+				break;
+			}
+			case '|': {
+				if(Peek() == '|') {
+					AddToken(OrType, fileData + currentPos, 2, line);
+					currentPos++;
+					break;
+				}
+				AddToken(BOrType, fileData + currentPos, 1, line);
+				break;
+			}
+			case '&': {
+				if(Peek() == '&') {
+					AddToken(AndType, fileData + currentPos, 2, line);
+					currentPos++;
+					break;
+				}
+				AddToken(BAndType, fileData + currentPos, 1, line);
+				break;
+			}
+			case '^': {
+				AddToken(BXorType, fileData + currentPos, 1, line);
 				break;
 			}
 			default: {

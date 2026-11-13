@@ -16,13 +16,15 @@ typedef enum VariableType {
 
 	identifierType,
 	invalidVariableType
-
 } VariableType_t;
 
 typedef enum ControlType {
 	ReturnType,
 	ForType,
 	WhileType,
+	IfType,
+	ElifType,
+	ElseType,
 	InvalidType
 } ControlType_t;
 
@@ -32,6 +34,8 @@ typedef enum TokenType{
     PtrType, 
     StringType,
 	NumberType,
+	ReferenceType,
+	DereferenceType,
 
     //Math
     AssignType, 
@@ -56,6 +60,13 @@ typedef enum TokenType{
 	LessType,
 	MoreType,
 	NotType,
+	AndType,
+	OrType,
+	BXorType,
+	BOrType,
+	BAndType,
+	BShiftLeftType,
+	BShiftRightType,
 
 	CurlyLeftType,
 	CurlyRightType,

@@ -1,5 +1,5 @@
-u8 a = 2;
-:u8 aPtr = :a;
+u8 a = 23;
+:u8 aPtr = "sup";
 
 u16 ja = a;
 
@@ -7,3 +7,26 @@ u16 ja = a;
 
 u32 zsa = a + (3*5);
 
+zsa = ja;
+
+// idk what happening no more
+s32	main: u32 input, u32 output {
+	:u16 testing = "20000";
+	
+	for: u16 a = 0; a < 10; a++ {
+		testing := zsalabob; 
+	}
+
+	while: 1+1 {
+		testing := 1; 
+	}
+
+	return (1+testing) + 4;
+}
+
+
+::s64 sup:  {
+}
+
+::s64 output = sup;
+:s64 testing = output:;
