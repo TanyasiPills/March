@@ -14,19 +14,28 @@ s32	main: u32 input, u32 output {
 	:u16 testing = "20000";
 	
 	for: u16 a = 0; a < 10; a++ {
-		testing := zsalabob; 
+		testing := ja; 
 	}
 
-	while: 1+1 {
+	while: a {
 		testing := 1; 
 	}
 
-	return (1+testing) + 4;
+	s32 output = s32|10;
+
+	return output;
+
+	if: u32|(u16|a < ja) || zsa {
+
+	}
 }
 
+/*
+long, long comment
+*/
 
 ::s64 sup:  {
 }
 
 ::s64 output = sup;
-:s64 testing = output:;
+:s64 testing = :s64|:output;

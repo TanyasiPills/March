@@ -36,6 +36,7 @@ typedef enum TokenType{
 	NumberType,
 	ReferenceType,
 	DereferenceType,
+	CastType,
 
     //Math
     AssignType, 
@@ -68,6 +69,7 @@ typedef enum TokenType{
 	BShiftLeftType,
 	BShiftRightType,
 
+	//function
 	CurlyLeftType,
 	CurlyRightType,
 

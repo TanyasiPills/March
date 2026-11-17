@@ -97,10 +97,12 @@ int ScanLong(){
 			return 0;
 		}
 		else if(Peek() == '*'){
-			printf("sup? %d\n",currentPos);
-			while(!(fileData[currentPos] == '*' || Peek() == '/') && fileData[currentPos] != '\0'){
+			while(!(fileData[currentPos] == '*' && Peek() == '/') && fileData[currentPos] != '\0'){
+				if(fileData[currentPos] == '\n') line++;
 				currentPos++;
 			}
+
+			if(fileData[currentPos] == '\n') line++;
 
 			if (fileData[currentPos] == '\0') {
 				LogLexerError(line, "End of file"); 
@@ -108,7 +110,6 @@ int ScanLong(){
 			}
 
 			currentPos += 2;
-			printf("sup? %d\n",currentPos);
 
 			return 0;
 		}

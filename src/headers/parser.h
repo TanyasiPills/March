@@ -15,6 +15,10 @@ typedef struct Parameter {
 	int name_lenght;
 } Parameter_t;
 
+typedef enum {
+	TrueType,
+	FalseType
+} BoolType_t;
 
 typedef struct ASTNode ASTNode_t;
 
@@ -99,6 +103,14 @@ typedef struct {
 	ASTNode_t** data;
 } ASTControl_t;
 
+typedef struct {
+	BoolType_t value;
+} ASTBoolean_t;
+
+typedef struct {
+	TypeInfo_t info;
+} ASTCast_t;
+
 typedef enum {
     // Declarations
     AST_VAR_DECL,    // e.g., u8 a = 2;
@@ -112,11 +124,12 @@ typedef enum {
     AST_UNARY,  // e.g., :a (address-of / pointer deref)
     AST_BINARY, // e.g., a + b (for future math)
 	AST_MEMBER_ACCS,
-	AST_INT,
 	AST_GROUP,
 	AST_ASSIGNMENT,
 	AST_CONTROL,
 	AST_LOGICAL,
+	AST_BOOLEAN,
+	AST_CAST,
 
     // Statements & Blocks
     AST_BLOCK,       // e.g., { ... }
@@ -141,6 +154,8 @@ typedef struct ASTNode {
 		ASTAssign_t		assign;
 		ASTControl_t	control;
 		ASTBinaryExpr_t logical;
+		ASTBoolean_t	boolean;
+		ASTCast_t		cast;
     };
 } ASTNode_t;
 

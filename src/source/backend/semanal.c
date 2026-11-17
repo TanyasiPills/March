@@ -7,16 +7,21 @@
 #include <codegen.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 Dictionary variables;
 Dictionary functions;
 
+TypeInfo_t currentReturnType;
 TypeInfo_t currentVarType;
 TypeInfo_t goalVarType;
 
 ASTNode_t* currVar = NULL;
 ASTNode_t* currFunc = NULL;
+
+int32_t prefixTextCount = 0;
+char* prefixText;
 
 ASTNode_t* FindIdentifier(Dictionary dic, const char* namestart, int len) {
 	char* key = malloc(sizeof(char)*len+1);
@@ -36,7 +41,7 @@ ASTNode_t* FindIdentifier(Dictionary dic, const char* namestart, int len) {
 bool CanStore(ASTNode_t* node, TypeInfo_t type) {
 	switch (node->kind) {
 		case AST_NUMBER:
-			if(type.type > 7) return false;
+			if(type.type > 9) return false;
 			return true;
 			break;
 		case AST_STRING:
@@ -95,18 +100,59 @@ bool CanStore(ASTNode_t* node, TypeInfo_t type) {
 			}
 			return true;
 			} break;
+		case AST_BOOLEAN: {
+			bool data = type.type <= f64Type;
+
+			if(!data) {
+				printf("type input: %d, type of decl: %d\n", type.type, node->func_decl.returnType.type);
+				printf("ptrdepth input: %d, ptrdepth of decl: %d\n", type.pointerDepth, node->func_decl.returnType.pointerDepth);
+				LogCDError("Function referenced doesnt return correct type (CanStore)", node->kind);
+				return false;
+			}
+
+			return true;
+			} break;
+		case AST_GROUP: {
+				bool data = currentVarType.type <= type.type;
+
+				if(!data) {
+					printf("type input: %d, type of decl: %d\n", type.type, node->func_decl.returnType.type);
+					printf("ptrdepth input: %d, ptrdepth of decl: %d\n", type.pointerDepth, node->func_decl.returnType.pointerDepth);
+					LogCDError("Function referenced doesnt return correct type (CanStore)", node->kind);
+					return false;
+				}
+
+				return true;
+			} break;
+		case AST_UNARY: {
+				bool data = currentVarType.type <= type.type;
+
+				if(!data) {
+					printf("type input: %d, type of decl: %d\n", type.type, node->func_decl.returnType.type);
+					printf("ptrdepth input: %d, ptrdepth of decl: %d\n", type.pointerDepth, node->func_decl.returnType.pointerDepth);
+					LogCDError("Function referenced doesnt return correct type (CanStore)", node->kind);
+					return false;
+				}
+
+				return true;
+			} break;
 		default:
 			LogCDError("cant find node type, so cant check if storage is compatable (CanStore)", node->kind);
 			return false;
 	}
 }
 
-bool MatchType(VariableType_t type1, VariableType_t type2){
-	return type1 == type2;
+bool CanLogical(TypeInfo_t left, TypeInfo_t right){
+	if(left.type <= 3) return right.type <= 3;
+	if(left.type > 3 && left.type <= 7) return right.type > 3 && right.type <= 7;
+	if(left.type > 7 && left.type <= 9) return right.type > 7 && right.type <= 9;
+
+	return false;
 }
 
+
 bool MatchTypeInfo(TypeInfo_t type1, TypeInfo_t type2) {
-	return MatchType(type1.type, type2.type) && (type1.pointerDepth == type2.pointerDepth);
+	return CanLogical(type1, type2) && (type1.pointerDepth == type2.pointerDepth);
 }
 
 bool AlreadyDeclared(const char* name) {
@@ -137,25 +183,42 @@ void AddToDic(Dictionary* dic, const char* name, int nameLenght, ASTNode_t* data
 	VectorPush(&(dic->value), &data);
 }
 
+void TPrefix(){
+	if(prefixText) free(prefixText);
+	prefixText = malloc(sizeof(char)* prefixTextCount+1);
+	for (size_t i = 0; i < prefixTextCount; i++) {	
+		prefixText[i] = '\t';
+	}
+	prefixText[prefixTextCount] = '\0';
+}
+
 int RecursiveAnalizing(ASTNode_t* node) {
 	if(node == NULL){
 		printf("da fak, passed null\n");
 		return 1;
 	}
+	
+	TPrefix();
+
 	int error;
 	switch (node->kind) {
 		case AST_BLOCK:
-			printf("Block\n");
+			printf("%sBlock\n",prefixText);
+
 			for (uint64_t i = 0; i < node->block.content.size; i++) {
+				prefixTextCount++;
 				error = RecursiveAnalizing(((ASTNode_t**)node->block.content.data)[i]);
+				prefixTextCount--;
 				if(error) return error;
 			}
 			break;
 		case AST_VAR_DECL: {
-			printf("Var declare\n");
+			printf("%sVar declare\n",prefixText);
 			goalVarType = node->var_decl.type;
 			if(node->var_decl.initializer) {
+				prefixTextCount++;
 				error = RecursiveAnalizing(node->var_decl.initializer);
+				prefixTextCount--;
 				if(error) return error;
 			}
 
@@ -168,24 +231,52 @@ int RecursiveAnalizing(ASTNode_t* node) {
 			goalVarType.type = invalidVariableType;
 			} break;
 		case AST_BINARY: {
-			printf("Binary expr\n");
+			printf("%sBinary expr\n",prefixText);
+			
+
+			// for more complex checking binary also needs goal type
+			printf("%sLeft:\n",prefixText);
+			prefixTextCount++;
 			error = RecursiveAnalizing(node->binary.left);
+			prefixTextCount--;
 			if(error) return error;
 			TypeInfo_t left = currentVarType;
 
+			TPrefix();
+
+			printf("%sRight:\n",prefixText);
+			prefixTextCount++;
 			error = RecursiveAnalizing(node->binary.right);
+			prefixTextCount--;
 			if(error) return error;
 			TypeInfo_t right = currentVarType;
 
+			if(node->binary.op == CastType) {
+				printf("left: %d; right: %d\n", left.pointerDepth, right.pointerDepth);
+				if(CanStore(node->binary.right, left) && left.pointerDepth == right.pointerDepth) {
+					currentVarType = left;	
+					break;
+				}
+
+				LogCDError("cant cast expression to the specified type", node->kind);
+				return 1;
+			}
+
 			if(!MatchTypeInfo(left, right)){
+
+				printf("left kind: %d; right kind: %d\n", left.type, right.type);
 				LogCDError("mismached types in binary expression (RecursiveAnalizing)", node->kind);
 				
 				return 1;
 			}
+
 			} break;
 		case AST_UNARY: {
-			printf("Unary\n");
+			printf("%sUnary\n",prefixText);
+			
+			prefixTextCount++;
 			error = RecursiveAnalizing(node->unary.effected);
+			prefixTextCount--;
 			if(error) return error;
 
 			if(node->unary.op == ReferenceType){
@@ -196,29 +287,37 @@ int RecursiveAnalizing(ASTNode_t* node) {
 				currentVarType.pointerDepth--;
 				break;
 			}
+
+			if(node->unary.op == IncrementType || node->unary.op == DecrementType){
+				break;
+			}
+
+			LogCDError("Cant find unary type (RecursiveAnalizing)", node->kind);
+			return 1;
 			} break;
 		case AST_NUMBER: {
-			printf("Number\n");
+			printf("%sNumber\n",prefixText);
+
 			if(!CanStore(node, goalVarType)){
+				LogCDError("Goal variable type cant store the curret literal (RecursiveAnalizing)", node->kind);
 				return 1;
 			}	
 			
 			TypeInfo_t varType =  { invalidVariableType, 0 };
 
-			if(goalVarType.type != invalidVariableType)
-				varType.type = goalVarType.type;
-			else{
-				LogCDError("Goal variable type is not set, cant compare literals (RecursiveAnalizing)", node->kind);
-				return 1;
-			}
+			if(node->number.type == UNSIGNED) varType.type = u64Type;
+			else if(node->number.type == SIGNED) varType.type = s64Type;
+			else varType.type = f64Type;
 
 			varType.pointerDepth = 0;
 
 			currentVarType = varType;
 			} break;
 		case AST_IDENTIFIER: {
-			printf("Identifier\n");
+			printf("%sIdentifier\n",prefixText);
+
 			if(!CanStore(node, goalVarType)) {
+				LogCDError("Identifier cant be stored in goal variable type", node->kind);
 				return 1;
 			}
 			
@@ -228,16 +327,12 @@ int RecursiveAnalizing(ASTNode_t* node) {
 			}
 
 			TypeInfo_t varType = {invalidVariableType, -1};
-			if(goalVarType.type != invalidVariableType)
-				varType.type = goalVarType.type;
-			else {
-				LogCDError("Goal variable type is not set, cant compare literals (RecursiveAnalizing)", node->kind);
-			}
+
 			if(currVar) {
-				varType.pointerDepth = currVar->var_decl.type.pointerDepth;
+				varType = currVar->var_decl.type;
 			}
 			else if(currFunc) {
-				varType.pointerDepth = currFunc->func_decl.returnType.pointerDepth;
+				varType = currFunc->func_decl.returnType;
 			}
 
 			currentVarType = varType;
@@ -246,17 +341,29 @@ int RecursiveAnalizing(ASTNode_t* node) {
 			currVar = NULL;
 			} break;
 		case AST_GROUP: {
-			printf("Group\n");
+			printf("%sGroup\n",prefixText);
+			prefixTextCount++;
 			error = RecursiveAnalizing(node->group.expr);
+			prefixTextCount--;
 			if(error) return error;
 			} break;
 		case AST_FUNC_DECL: {
-			printf("Function decleration\n");
+			printf("%sFunction decleration\n", prefixText);
+
 			AddToDic(&functions, node->func_decl.name_start, node->func_decl.name_length, node);
+
+			TypeInfo_t tmp = currentReturnType;
+			currentReturnType = node->func_decl.returnType;
+
+			prefixTextCount++;
 			RecursiveAnalizing(node->func_decl.body);
+			prefixTextCount--;
+
+			currentReturnType = tmp;
 			} break;
 		case AST_FUNC_CALL: {
-			printf("Function call\n");
+			printf("%sFunction call\n", prefixText);
+
 			ASTNode_t* function = FindIdentifier(functions, node->func_call.identifier->identifier.name_start, node->func_call.identifier->identifier.name_lenght);
 			if(!function) {
 				LogCDError("Function reference points to a non-existant function (RecursiveAnalizing)", node->kind);
@@ -282,7 +389,9 @@ int RecursiveAnalizing(ASTNode_t* node) {
 					return 1;
 				}
 				goalVarType = curType;
+				prefixTextCount++;
 				RecursiveAnalizing(curNode);
+				prefixTextCount--;
 
 				if(!MatchTypeInfo(goalVarType, currentVarType)) {
 					LogCDError("parameter type doesnt align with function declaretion parameter type (RecursiveAnalizing)", node->kind);
@@ -296,7 +405,8 @@ int RecursiveAnalizing(ASTNode_t* node) {
 			currentVarType = returnType;
 			} break;
 		case AST_STRING: {
-			printf("String\n");
+			printf("%sString\n",prefixText);
+
 			if(!CanStore(node, goalVarType)){
 				return 1;
 			}	
@@ -314,17 +424,16 @@ int RecursiveAnalizing(ASTNode_t* node) {
 			currentVarType = varType;
 			} break;
 		case AST_ASSIGNMENT: {
-			printf("Assignment\n");
-			ASTNode_t* curVal = FindIdentifier(variables, node->assign.target->identifier.name_start, node->assign.target->identifier.name_lenght);
+			printf("%sAssignment\n",prefixText);
+			
+			if(node->assign.target->kind == identifierType);
 
-			if(!curVal){
-				LogCDError("Cant find the variable to assign to (RecursiveAnalizing)", node->kind);
-				return 1;
-			}
+			RecursiveAnalizing(node->assign.target);
+			goalVarType = currentVarType;
 
-			goalVarType = curVal->var_decl.type;
-
+			prefixTextCount++;
 			error = RecursiveAnalizing(node->assign.value);
+			prefixTextCount--;
 			if(error) return error;
 
 			if(!MatchTypeInfo(goalVarType, currentVarType)) {
@@ -335,11 +444,137 @@ int RecursiveAnalizing(ASTNode_t* node) {
 
 			} break;
 		case AST_LOGICAL: {
-			printf("Logical\n");
+			printf("%sLogical\n",prefixText);
+			prefixTextCount++;	
+			printf("%sLeft:\n",prefixText);
+			error = RecursiveAnalizing(node->logical.left);
+			prefixTextCount--;
+			if(error) return error;
+			TypeInfo_t left = currentVarType;
+
+			TPrefix();
+
+			printf("%sRight:\n", prefixText);
+			prefixTextCount++;
+			error = RecursiveAnalizing(node->logical.right);
+			prefixTextCount--;
+			if(error) return error;
+			TypeInfo_t right = currentVarType;
+
+			if(!CanLogical(left, right)) {
+				printf("left kind: %d; right kind: %d\n", left.type, right.type);
+				LogCDError("mismached types in logical expression (RecursiveAnalizing)", node->kind);
 				
+				return 1;
+			}
 			} break;
 		case AST_CONTROL: {
-			printf("Control; type=%d\n", node->control.type);
+			printf("%sControl; type=%d\n", prefixText, node->control.type);
+
+			switch (node->control.type) {
+				case ElifType:
+				case IfType: {
+					if(node->control.data[0]->kind != AST_LOGICAL && node->control.data[0]->kind != AST_IDENTIFIER) {
+						LogCDError("If statement expression must be a logical comparison or variable reference (RecursiveAnalizing)", node->kind);
+						return 1;
+					}
+
+					goalVarType.type = f64Type;
+					goalVarType.pointerDepth = 0;
+					
+					prefixTextCount++;
+					RecursiveAnalizing(node->control.data[0]);
+					prefixTextCount--;
+
+					TPrefix();
+
+					prefixTextCount++;
+					RecursiveAnalizing(node->control.data[1]);
+					prefixTextCount--;
+					} break;
+				case WhileType: {
+					if(node->control.data[0]->kind != AST_LOGICAL && node->control.data[0]->kind != AST_IDENTIFIER) {
+						LogCDError("While statement expression must be a logical comparison or variable reference (RecursiveAnalizing)", node->kind);
+						return 1;
+					}
+
+					goalVarType.type = f64Type;
+					goalVarType.pointerDepth = 0;
+					
+					prefixTextCount++;
+					RecursiveAnalizing(node->control.data[0]);
+					prefixTextCount--;
+					} break;
+				case ForType: {
+					prefixTextCount++;
+
+					if(node->control.data[0]->kind != AST_VAR_DECL) {
+						LogCDError("For statement's first expression must be a variable decleration (RecursiveAnalizing)", node->kind);
+						return 1;
+					}
+
+					RecursiveAnalizing(node->control.data[0]);
+
+					if(node->control.data[1]->kind != AST_LOGICAL && node->control.data[1]->kind != AST_IDENTIFIER) {
+						LogCDError("For statement's second expression must be a logical comparison or variable reference (RecursiveAnalizing)", node->kind);
+						return 1;
+					}
+
+					goalVarType.type = f64Type;
+					goalVarType.pointerDepth = 0;
+
+					error = RecursiveAnalizing(node->control.data[1]);
+					if(error) return error;
+
+					// idk if i should check the last parameter stores
+					error = RecursiveAnalizing(node->control.data[2]);
+					if(error) return error;
+
+					error = RecursiveAnalizing(node->control.data[3]);
+					if(error) return error;
+					} break;
+				case ElseType: {
+					RecursiveAnalizing(node->control.data[0]);
+					} break;
+				case ReturnType: {
+					currentVarType.type = invalidVariableType;
+					goalVarType = currentReturnType;
+					RecursiveAnalizing(node->control.data[0]);
+
+					if(!MatchTypeInfo(currentVarType, currentReturnType)) {
+						LogCDError("Returned type doesnt match the function return type", node->kind);
+						return 1;
+					}
+					break;
+				}
+				default:
+					LogCDError("Cannot find control type (RecursiveAnalizing)", node->kind);
+					return 1;
+					break;
+			}
+			} break;
+		case AST_BOOLEAN: {
+			printf("%sBoolean\n", prefixText);
+			if(!CanStore(node, goalVarType)){
+				return 1;
+			}
+
+			TypeInfo_t varType;
+			if(goalVarType.type != invalidVariableType)
+				varType.type = goalVarType.type;
+			else {
+				LogCDError("Goal variable type is not set, cant compare booleans (RecursiveAnalizing)", node->kind);
+				return 1;
+			}
+
+			varType.pointerDepth = 0;
+
+			currentVarType = varType;
+
+			}break;
+		case AST_CAST: {
+			printf("%sCast\n",prefixText);
+			currentVarType = node->cast.info;
 			} break;
 		default:
 			LogCDError("Cant find AST node kind (RecursiveAnalizing)", node->kind);

@@ -3,6 +3,7 @@
 #include "logger.h"
 #include "vector.h"
 #include <parser.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -42,6 +43,7 @@ static const ControlMapping conTypes[] = {
 uint64_t tokenPos = 0;
 Token_t currentToken;
 ASTNode_t* astTree;
+bool needLogical = false;
 
 bool isVariableControl(const char* text, ControlType_t* controlDst){
 	int count = sizeof(conTypes) / sizeof(conTypes[0]);
@@ -133,6 +135,7 @@ ASTNode_t* Primary() {
 		data->line = currentToken.line;
 		data->kind = AST_NUMBER;
 		data->number.value = value;
+		data->number.type = UNSIGNED;
 		return data;
 	}
 	if(Check(SymbolType)) {
@@ -224,14 +227,15 @@ ASTNode_t* Postfix() {
 		return tmp;
 	}
 	
-	
 	if(expr->kind == AST_IDENTIFIER && Match(PtrType)) {
 		GetText(&currentToken);
+
+		printf("tokenText: %s\n", tokenText);
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
 		data->line = expr->line;
 
-		if(!isVariableType(tokenText, NULL) && !isVariableControl(tokenText, NULL) 
-				&& currentToken.type != LineType && currentToken.type != EOFType && currentToken.type != AssignType){
+		if(!isVariableType(tokenText, NULL) && !isVariableControl(tokenText, NULL)									// ez nem jó, majd meg kell oldani jobban (A ptrtype-ot)
+				&& currentToken.type != LineType && currentToken.type != EOFType && currentToken.type != AssignType && currentToken.type != PtrType){ 
 			data->kind = AST_FUNC_CALL;
 			data->func_call.identifier = expr;
 			VectorInit(&data->func_call.params, 2, sizeof(ASTNode_t*));
@@ -252,14 +256,76 @@ ASTNode_t* Postfix() {
 		data->kind = AST_UNARY;
 		data->unary.op = DereferenceType;
 		data->unary.effected = expr;
+		
+		expr = data;
+	}
+	while (Check(PtrType)) {
+		ConsumeToken();
+		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		data->line = expr->line;
+		data->kind = AST_UNARY;
+		data->unary.op = DereferenceType;
+		data->unary.effected = expr;
 
-		return data;
+		expr = data;
 	}
 
 	return expr;
 }
 
 ASTNode_t* Prefix() {
+	if(Check(SymbolType) || Check(PtrType)) {
+		uint64_t ptrCount = 0;
+		uint64_t displacement = 0;
+		while (((Token_t*)tokens.data)[tokenPos+displacement].type == PtrType) {
+			ptrCount++;
+			displacement++;
+		}
+
+		GetText(&((Token_t*)tokens.data)[tokenPos+displacement]);
+		VariableType_t curType;
+		if(isVariableType(tokenText, &curType)) {
+			for (size_t i = 0; i < ptrCount; i++) {
+				ConsumeToken();
+			}
+			ConsumeToken();
+
+			if(Check(PtrType) && ptrCount > 0){
+				LogError(currentToken.line, "Cant reference and dereference in a cast at the same time");
+				return NULL;
+			}
+
+			while (Check(PtrType)) {
+				ptrCount++;
+				ConsumeToken();
+			}
+
+			Token_t type = Expect(BOrType, "Expected cast symbol '|' (Prefix)");
+			if(type.type == InvalidTokenType) return NULL;
+
+			ASTNode_t* data = malloc(sizeof(ASTNode_t));
+			ASTNode_t* cast = malloc(sizeof(ASTNode_t));
+
+			cast->line = currentToken.line;
+			cast->kind = AST_CAST;
+			cast->cast.info.type = curType;
+			cast->cast.info.pointerDepth = ptrCount;
+
+			data->line = currentToken.line;
+			data->kind = AST_BINARY;
+			data->binary.left = cast;
+			data->binary.op = CastType;
+			data->binary.right = Prefix();
+
+			if(!data->binary.right){
+				free(data);
+				return NULL;
+			}
+
+			return data;
+		}
+	}
+
 	if(Check(PtrType)) {
 		ConsumeToken();
 		ASTNode_t* data = malloc(sizeof(ASTNode_t));
@@ -308,8 +374,8 @@ ASTNode_t* Term() {
 		tmp->binary.op = op;
 		tmp->binary.right = right;
 		left = tmp;
-
 	}
+
 	return left;
 }
 
@@ -343,6 +409,25 @@ ASTNode_t* Expression() {
 		tmp->binary.op = op;
 		tmp->binary.right = right;
 		left = tmp;
+	}
+
+	if(needLogical && (left->kind == AST_IDENTIFIER || left->kind == AST_NUMBER)) {
+		ASTNode_t* data = malloc(sizeof(ASTNode_t));
+		ASTNode_t* trueStatement = malloc(sizeof(ASTNode_t));
+
+		printf("sup at line: %d",currentToken.line);
+
+		trueStatement->line = currentToken.line;
+		trueStatement->kind = AST_BOOLEAN;
+		trueStatement->boolean.value = TrueType;
+
+		data->line = currentToken.line;
+		data->kind = AST_LOGICAL;
+		data->binary.left = left;
+		data->binary.op = EqualType;
+		data->binary.right = trueStatement; 
+
+		left = data;
 	}
 
 	return left;
@@ -467,8 +552,11 @@ ASTNode_t* Control(ControlType_t controlType) {
 
 			type = Expect(PtrType, "Expected ':' after if keyword (Control)");
 			if(type.type == InvalidTokenType) goto cleanup;
-
+			
+			needLogical = true;
 			data->control.data[0] = Expression();
+			printf("Data type: %d\n", data->control.data[0]->kind);
+			needLogical = false;
 			if(!data->control.data[0]) goto cleanup;
 
 			data->control.data[1] = Block();
@@ -529,13 +617,13 @@ ASTNode_t* Control(ControlType_t controlType) {
 			type = Expect(PtrType, "Expected ':' after for keyword (Control)");
 			if(type.type == InvalidTokenType) goto cleanup;
 
-			data->control.data = malloc(sizeof(ASTNode_t*));
+			data->control.data = malloc(sizeof(ASTNode_t*)*2);
 
 			data->control.data[0] = Expression();
 			if(!data->control.data[0]) goto cleanup;
 
-			data->control.data[3] = Block();
-			if(!data->control.data[3]) goto cleanup;
+			data->control.data[1] = Block();
+			if(!data->control.data[1]) goto cleanup;
 
 			break;
 		default:
